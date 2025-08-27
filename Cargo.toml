@@ -1,7 +1,12 @@
 [package]
 name = "optee_ftrace_viewer"
+description = "A TUI application to view OP-TEE ftrace intuitively"
+authors = ["Leo Chen <leo881003@gmail.com>"]
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.89.0"
+repository = "https://github.com/Leo1003/optee_ftrace_viewer"
+license = "Apache-2.0"
 
 [dependencies]
 clap = { version = "4.5.46", features = ["derive"] }
