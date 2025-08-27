@@ -1,0 +1,117 @@
+use std::{
+    fmt::{Display, Formatter},
+    iter::FusedIterator,
+    time::Duration,
+};
+
+use crate::ftrace::RawFtrace;
+
+#[derive(Clone, Debug)]
+pub struct FtraceTree {
+    children: Vec<FtraceNode>,
+}
+
+impl FtraceTree {
+    pub fn new(children: Vec<FtraceNode>) -> Self {
+        Self { children }
+    }
+
+    pub fn from_root_node(root: FtraceNode) -> Self {
+        Self {
+            children: root.children,
+        }
+    }
+
+    pub fn dfs_iter(&self) -> FtraceDfsIter<'_> {
+        FtraceDfsIter {
+            stack: vec![self.children.iter()],
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct FtraceNode {
+    children: Vec<FtraceNode>,
+    depth: u8,
+    func: u64,
+    time: Option<Duration>,
+}
+
+impl FtraceNode {
+    pub fn new(depth: u8, func: u64, time: Option<Duration>) -> Self {
+        Self {
+            children: Vec::new(),
+            depth,
+            func,
+            time,
+        }
+    }
+
+    pub fn with_start(code: RawFtrace) -> Result<Self, FtraceTreeError> {
+        if !code.is_start() {
+            return Err(FtraceTreeError(()));
+        }
+
+        Ok(Self::new(code.depth(), code.data(), None))
+    }
+
+    pub fn end_with(&mut self, code: RawFtrace) -> Result<(), FtraceTreeError> {
+        if !code.is_end() {
+            return Err(FtraceTreeError(()));
+        }
+
+        self.time = Some(Duration::from_nanos(code.data()));
+        Ok(())
+    }
+
+    pub fn add_child(&mut self, child: FtraceNode) {
+        self.children.push(child);
+    }
+
+    pub fn depth(&self) -> u8 {
+        self.depth
+    }
+
+    pub fn func(&self) -> u64 {
+        self.func
+    }
+
+    pub fn time(&self) -> Option<Duration> {
+        self.time
+    }
+}
+
+pub struct FtraceDfsIter<'a> {
+    stack: Vec<std::slice::Iter<'a, FtraceNode>>,
+}
+
+impl<'a> Iterator for FtraceDfsIter<'a> {
+    type Item = &'a FtraceNode;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            // If the stack is empty, we're done,
+            let top = self.stack.last_mut()?;
+            if let Some(item) = top.next() {
+                // Push the children iterator onto the stack
+                self.stack.push(item.children.iter());
+                return Some(item);
+            } else {
+                // Pop the empty iterator and continue
+                self.stack.pop();
+            }
+        }
+    }
+}
+impl FusedIterator for FtraceDfsIter<'_> {}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct FtraceTreeError(());
+
+impl Display for FtraceTreeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FtraceError")
+    }
+}
+
+impl std::error::Error for FtraceTreeError {}
