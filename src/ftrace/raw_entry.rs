@@ -1,5 +1,3 @@
-pub const MAGIC: &[u8] = b"FTRACE\x00\x01";
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct RawFtrace(u64);
 

@@ -1,6 +1,5 @@
-use crate::ftrace::RawFtrace;
+use crate::ftrace::{FtraceError, RawFtrace};
 use std::{
-    fmt::{Display, Formatter},
     iter::FusedIterator,
     time::Duration,
 };
@@ -51,17 +50,17 @@ impl FtraceNode {
         }
     }
 
-    pub fn with_start(code: RawFtrace) -> Result<Self, FtraceTreeError> {
+    pub fn with_start(code: RawFtrace) -> Result<Self, FtraceError> {
         if !code.is_start() {
-            return Err(FtraceTreeError(()));
+            return Err(FtraceError);
         }
 
         Ok(Self::new(code.depth(), code.data(), None))
     }
 
-    pub fn end_with(&mut self, code: RawFtrace) -> Result<(), FtraceTreeError> {
+    pub fn end_with(&mut self, code: RawFtrace) -> Result<(), FtraceError> {
         if !code.is_end() {
-            return Err(FtraceTreeError(()));
+            return Err(FtraceError);
         }
 
         self.time = Some(Duration::from_nanos(code.data()));
@@ -108,14 +107,3 @@ impl<'a> Iterator for FtraceDfsIter<'a> {
     }
 }
 impl FusedIterator for FtraceDfsIter<'_> {}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct FtraceTreeError(());
-
-impl Display for FtraceTreeError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "FtraceError")
-    }
-}
-
-impl std::error::Error for FtraceTreeError {}
