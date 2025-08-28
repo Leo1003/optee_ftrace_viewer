@@ -16,13 +16,14 @@ pub use tree::{FtraceNode, FtraceTree, FtraceTreeError};
 pub async fn build_ftrace_tree_from_file(path: &Path) -> Result<FtraceTree> {
     let f = File::open(path).await?;
     let mut reader = BufReader::new(f);
-    seek_to_ftrace_magic(&mut reader).await?;
+    let mut trace_info = String::new();
+    read_to_ftrace_magic(&mut reader, &mut trace_info).await?;
 
     let mut buf = [0u8; 8];
     let mut root = FtraceNode::new(0, 0, None);
     root = recursive_build_tree(&mut reader, &mut buf, root, 0).await?;
 
-    Ok(FtraceTree::from_root_node(root))
+    Ok(FtraceTree::from_root_node(trace_info, root))
 }
 
 async fn recursive_build_tree<R>(
@@ -80,10 +81,11 @@ where
     Ok(Some(RawFtrace::from(u64::from_le_bytes(*buf))))
 }
 
-async fn seek_to_ftrace_magic<R>(reader: &mut R) -> Result<()>
+async fn read_to_ftrace_magic<R>(reader: &mut R, trace_info: &mut String) -> Result<()>
 where
     R: AsyncBufRead + Unpin,
 {
+    let mut info_buf = Vec::new();
     let finder = Finder::new(MAGIC);
     loop {
         let buf = reader.fill_buf().await?;
@@ -92,11 +94,15 @@ where
         }
 
         if let Some(i) = finder.find(buf) {
+            info_buf.extend_from_slice(&buf[..i]);
             reader.consume(i + MAGIC.len());
+
+            *trace_info = String::from_utf8(info_buf)?;
             return Ok(());
         }
 
         let len = buf.len() - MAGIC.len() + 1;
+        info_buf.extend_from_slice(&buf[..len]);
         reader.consume(len);
     }
 

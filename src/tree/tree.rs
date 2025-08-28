@@ -1,23 +1,27 @@
+use crate::ftrace::RawFtrace;
 use std::{
     fmt::{Display, Formatter},
     iter::FusedIterator,
     time::Duration,
 };
 
-use crate::ftrace::RawFtrace;
-
 #[derive(Clone, Debug)]
 pub struct FtraceTree {
+    trace_info: String,
     children: Vec<FtraceNode>,
 }
 
 impl FtraceTree {
-    pub fn new(children: Vec<FtraceNode>) -> Self {
-        Self { children }
+    pub fn new(trace_info: String, children: Vec<FtraceNode>) -> Self {
+        Self {
+            trace_info,
+            children,
+        }
     }
 
-    pub fn from_root_node(root: FtraceNode) -> Self {
+    pub fn from_root_node(trace_info: String, root: FtraceNode) -> Self {
         Self {
+            trace_info,
             children: root.children,
         }
     }
