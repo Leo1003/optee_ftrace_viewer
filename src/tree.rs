@@ -56,6 +56,7 @@ where
             cur_node.add_child(child);
         } else if entry.is_end() {
             cur_node.end_with(entry)?;
+            break;
         }
     }
 
