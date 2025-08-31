@@ -1,8 +1,5 @@
 use crate::ftrace::{FtraceError, RawFtrace};
-use std::{
-    iter::FusedIterator,
-    time::Duration,
-};
+use std::{iter::FusedIterator, time::Duration};
 
 #[derive(Clone, Debug)]
 pub struct FtraceTree {
@@ -23,6 +20,10 @@ impl FtraceTree {
             trace_info,
             children: root.children,
         }
+    }
+
+    pub fn children(&self) -> impl Iterator<Item = &FtraceNode> {
+        self.children.iter()
     }
 
     pub fn dfs_iter(&self) -> FtraceDfsIter<'_> {
@@ -81,6 +82,14 @@ impl FtraceNode {
 
     pub fn time(&self) -> Option<Duration> {
         self.time
+    }
+
+    pub fn children(&self) -> impl Iterator<Item = &FtraceNode> {
+        self.children.iter()
+    }
+
+    pub fn children_mut(&mut self) -> impl Iterator<Item = &mut FtraceNode> {
+        self.children.iter_mut()
     }
 }
 

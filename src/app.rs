@@ -1,16 +1,20 @@
-use crate::{cli::Cli, reader::build_ftrace_tree_from_file};
+use crate::{
+    cli::Cli,
+    reader::build_ftrace_tree_from_file,
+    ui::{
+        components::TraceTreeComponent,
+        event::{Event, EventGenerator},
+    },
+};
 use color_eyre::eyre::Result;
-use crossterm::event::{Event, EventStream, KeyCode};
-use futures::StreamExt as _;
-use ratatui::{crossterm, layout::Alignment, widgets::{Block, BorderType, Paragraph}, DefaultTerminal};
-use std::{fmt::Write as _, time::Duration};
+use crossterm::event::KeyCode;
+use ratatui::{DefaultTerminal, crossterm};
+use std::time::Duration;
 
 #[derive(Clone, Debug)]
 pub struct App {
     args: Cli,
     stopping: bool,
-    text: String,
-    scroll: u16,
 }
 
 impl App {
@@ -18,53 +22,30 @@ impl App {
         Self {
             args,
             stopping: false,
-            text: String::new(),
-            scroll: 0,
         }
     }
 
     pub async fn run(&mut self, mut terminal: DefaultTerminal) -> Result<()> {
         let tree = build_ftrace_tree_from_file(&self.args.ftrace_path).await?;
-        let mut buf = String::new();
-        for node in tree.dfs_iter() {
-            writeln!(
-                buf,
-                "{}0x{:016x}(): {:?}",
-                "  ".repeat(node.depth() as usize),
-                node.func(),
-                node.time(),
-            )
-            .ok();
-        }
-        self.text = buf;
+        let mut tree_component = TraceTreeComponent::build_from_ftrace_tree(&tree);
 
-        let mut event_stream = EventStream::new();
+        let mut event_generator = EventGenerator::new(Duration::from_millis(30));
         while !self.stopping {
-            terminal.draw(|frame| {
-                let block = Block::bordered()
-                    .title("optee-ftrace-viewer")
-                    .title_alignment(Alignment::Center)
-                    .border_type(BorderType::Rounded);
-                let widget = Paragraph::new(self.text.as_str())
-                    .block(block)
-                    .alignment(Alignment::Left)
-                    .scroll((self.scroll, 0));
-                frame.render_widget(widget, frame.area());
-            })?;
-            tokio::select! {
-                Some(Ok(evt)) = event_stream.next() => {
-                    #[allow(clippy::single_match)]
-                    match evt {
-                        Event::Key(key_event) => {
-                            self.handle_key_event(key_event);
-                        }
-                        _ => {}
+            terminal
+                .draw(|frame| {
+                    tree_component.render(frame, frame.area());
+                })
+                .unwrap();
+            let event = event_generator.poll_next().await;
+            if let &Event::Key(key_event) = &event {
+                match key_event.code {
+                    KeyCode::Char('q') | KeyCode::Esc => {
+                        self.stopping = true;
                     }
-                }
-                _ = tokio::time::sleep(Duration::from_millis(100)) => {
-                    // Just to refresh the UI periodically
+                    _ => (),
                 }
             }
+            tree_component.handle_event(event);
         }
 
         Ok(())
@@ -77,12 +58,6 @@ impl App {
             }
             KeyCode::Esc => {
                 self.stopping = true;
-            }
-            KeyCode::Up => {
-                self.scroll = self.scroll.saturating_sub(1);
-            }
-            KeyCode::Down => {
-                self.scroll = self.scroll.saturating_add(1);
             }
             _ => {}
         }
