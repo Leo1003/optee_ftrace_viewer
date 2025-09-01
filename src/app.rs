@@ -64,6 +64,7 @@ impl App {
 
 #[derive(Clone, Debug)]
 pub enum AppMsg {
+    SetFtraceTitle(String),
     UpdateTree(Vec<TreeItem<'static, u64>>),
 }
 
@@ -73,7 +74,8 @@ async fn initialize_ftrace(
 ) -> Result<()> {
     let tree = build_ftrace_tree_from_file(ftrace_file).await?;
     let tree_data = TraceTreeComponent::build_tree_data(&tree);
-    let _symbol_info: SymbolInfo = tree.trace_info().parse()?;
+    let symbol_info: SymbolInfo = tree.trace_info().parse()?;
+    event_sender.send(AppMsg::SetFtraceTitle(symbol_info.title.clone()))?;
     event_sender.send(AppMsg::UpdateTree(tree_data))?;
     Ok(())
 }
