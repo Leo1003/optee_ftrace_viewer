@@ -22,6 +22,10 @@ impl FtraceTree {
         }
     }
 
+    pub fn trace_info(&self) -> &str {
+        &self.trace_info
+    }
+
     pub fn children(&self) -> impl Iterator<Item = &FtraceNode> {
         self.children.iter()
     }
@@ -53,7 +57,7 @@ impl FtraceNode {
 
     pub fn with_start(code: RawFtrace) -> Result<Self, FtraceError> {
         if !code.is_start() {
-            return Err(FtraceError);
+            return Err(FtraceError::InvalidEntry);
         }
 
         Ok(Self::new(code.depth(), code.data(), None))
@@ -61,7 +65,7 @@ impl FtraceNode {
 
     pub fn end_with(&mut self, code: RawFtrace) -> Result<(), FtraceError> {
         if !code.is_end() {
-            return Err(FtraceError);
+            return Err(FtraceError::InvalidEntry);
         }
 
         self.time = Some(Duration::from_nanos(code.data()));

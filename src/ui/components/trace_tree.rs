@@ -1,4 +1,6 @@
+use super::Component;
 use crate::{
+    app::AppMsg,
     ftrace::{FtraceNode, FtraceTree},
     ui::event::Event,
 };
@@ -12,14 +14,28 @@ use ratatui::{
 use std::time::Duration;
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct TraceTreeComponent {
     data: Vec<TreeItem<'static, u64>>,
     state: TreeState<u64>,
 }
 
 impl TraceTreeComponent {
-    pub fn build_from_ftrace_tree(tree: &FtraceTree) -> Self {
+    pub fn new() -> Self {
+        Self {
+            data: Vec::new(),
+            state: TreeState::default(),
+        }
+    }
+
+    pub fn with_ftrace_tree(tree: &FtraceTree) -> Self {
+        TraceTreeComponent {
+            data: Self::build_tree_data(tree),
+            state: TreeState::default(),
+        }
+    }
+
+    pub fn build_tree_data(tree: &FtraceTree) -> Vec<TreeItem<'static, u64>> {
         let mut data = Vec::new();
 
         let time = tree
@@ -30,13 +46,12 @@ impl TraceTreeComponent {
             data.push(build_ftrace_ui_tree(child_id as u64, children, time));
         }
 
-        TraceTreeComponent {
-            data,
-            state: TreeState::default(),
-        }
+        data
     }
+}
 
-    pub fn handle_event(&mut self, event: Event) {
+impl Component<AppMsg> for TraceTreeComponent {
+    fn handle(&mut self, event: Event<AppMsg>) {
         match event {
             Event::Key(key_event) => match key_event.code {
                 KeyCode::Up => {
@@ -81,11 +96,15 @@ impl TraceTreeComponent {
                 }
                 _ => (),
             },
+            Event::Message(AppMsg::UpdateTree(tree_data)) => {
+                self.data = tree_data;
+                self.state = TreeState::default();
+            }
             _ => (),
         }
     }
 
-    pub fn render(&mut self, frame: &mut Frame, area: Rect) {
+    fn render(&mut self, frame: &mut Frame, area: Rect) {
         let widget = Tree::new(&self.data)
             .unwrap()
             .highlight_style(Style::new().add_modifier(Modifier::REVERSED));

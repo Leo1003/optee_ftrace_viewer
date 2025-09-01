@@ -1,12 +1,15 @@
-use std::fmt::{Display, Formatter};
+use thiserror::Error;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct FtraceError;
-
-impl Display for FtraceError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "FtraceError")
-    }
+#[derive(Clone, Debug, Error, PartialEq, Eq, Hash)]
+pub enum FtraceError {
+    #[error("Uuid error: {0}")]
+    UuidError(#[from] uuid::Error),
+    #[error("Invalid ftrace entry")]
+    InvalidEntry,
+    #[error("Failed to parse symbol information")]
+    InvalidSymbolInfo,
+    #[error("Failed to parse region table")]
+    InvalidRegionTable,
+    #[error("Failed to parse region flags")]
+    InvalidRegionFlags,
 }
-
-impl std::error::Error for FtraceError {}
