@@ -6,6 +6,7 @@ use crate::app::App;
 mod app;
 mod cli;
 mod ftrace;
+mod symbol;
 mod reader;
 mod ui;
 

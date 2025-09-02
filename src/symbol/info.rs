@@ -1,4 +1,4 @@
-use super::FtraceError;
+use super::error::SymbolError;
 use bitflags::bitflags;
 use regex::Regex;
 use std::{collections::HashMap, str::FromStr, sync::LazyLock};
@@ -34,21 +34,21 @@ pub struct SymbolInfo {
 }
 
 impl FromStr for SymbolInfo {
-    type Err = FtraceError;
+    type Err = SymbolError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut lines = s.lines().peekable();
         // Parsing OP-TEE load address
-        let tee_load_addr_line = lines.next().ok_or(FtraceError::InvalidRegionTable)?;
+        let tee_load_addr_line = lines.next().ok_or(SymbolError::InvalidRegionTable)?;
         let tee_load_addr_caps = TEE_LOAD_ADDR_REGEX
             .captures(tee_load_addr_line)
-            .ok_or(FtraceError::InvalidSymbolInfo)?;
+            .ok_or(SymbolError::InvalidSymbolInfo)?;
         let tee_load_addr_hex = tee_load_addr_caps
             .name("load_addr")
             .and_then(|m| m.as_str().strip_prefix("0x"))
-            .ok_or(FtraceError::InvalidSymbolInfo)?;
+            .ok_or(SymbolError::InvalidSymbolInfo)?;
         let tee_load_addr = u64::from_str_radix(tee_load_addr_hex, 16)
-            .map_err(|_| FtraceError::InvalidSymbolInfo)?;
+            .map_err(|_| SymbolError::InvalidSymbolInfo)?;
 
         // Parsing region table
         let mut regions = Vec::new();
@@ -65,21 +65,21 @@ impl FromStr for SymbolInfo {
         }
 
         // Parsing function graph info
-        let func_graph_line = lines.next().ok_or(FtraceError::InvalidRegionTable)?;
+        let func_graph_line = lines.next().ok_or(SymbolError::InvalidRegionTable)?;
         let func_graph_caps = FUNC_GRAPH_REGEX
             .captures(func_graph_line)
-            .ok_or(FtraceError::InvalidSymbolInfo)?;
+            .ok_or(SymbolError::InvalidSymbolInfo)?;
         let uuid_str = func_graph_caps
             .name("uuid")
-            .ok_or(FtraceError::InvalidSymbolInfo)?
+            .ok_or(SymbolError::InvalidSymbolInfo)?
             .as_str();
         let ta_addr_hex = func_graph_caps
             .name("addr")
-            .ok_or(FtraceError::InvalidSymbolInfo)?
+            .ok_or(SymbolError::InvalidSymbolInfo)?
             .as_str();
         let ta_uuid = Uuid::parse_str(uuid_str)?;
         let ta_load_addr =
-            u64::from_str_radix(ta_addr_hex, 16).map_err(|_| FtraceError::InvalidSymbolInfo)?;
+            u64::from_str_radix(ta_addr_hex, 16).map_err(|_| SymbolError::InvalidSymbolInfo)?;
 
         Ok(Self {
             tee_load_addr,
@@ -100,32 +100,32 @@ pub struct ElfInfo {
 }
 
 impl FromStr for ElfInfo {
-    type Err = FtraceError;
+    type Err = SymbolError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let caps = ELF_LIST_REGEX
             .captures(s)
-            .ok_or(FtraceError::InvalidSymbolInfo)?;
+            .ok_or(SymbolError::InvalidSymbolInfo)?;
 
         let idx_str = caps
             .name("idx")
-            .ok_or(FtraceError::InvalidSymbolInfo)?
+            .ok_or(SymbolError::InvalidSymbolInfo)?
             .as_str();
         let uuid_str = caps
             .name("uuid")
-            .ok_or(FtraceError::InvalidSymbolInfo)?
+            .ok_or(SymbolError::InvalidSymbolInfo)?
             .as_str();
         let load_addr_str = caps
             .name("load_addr")
             .and_then(|m| m.as_str().strip_prefix("0x"))
-            .ok_or(FtraceError::InvalidSymbolInfo)?;
+            .ok_or(SymbolError::InvalidSymbolInfo)?;
 
         let idx = idx_str
             .parse()
-            .map_err(|_| FtraceError::InvalidSymbolInfo)?;
+            .map_err(|_| SymbolError::InvalidSymbolInfo)?;
         let uuid = Uuid::parse_str(uuid_str)?;
         let load_addr =
-            u64::from_str_radix(load_addr_str, 16).map_err(|_| FtraceError::InvalidSymbolInfo)?;
+            u64::from_str_radix(load_addr_str, 16).map_err(|_| SymbolError::InvalidSymbolInfo)?;
         Ok(Self {
             idx,
             uuid,
@@ -144,41 +144,41 @@ pub struct RegionData {
 }
 
 impl FromStr for RegionData {
-    type Err = FtraceError;
+    type Err = SymbolError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let caps = REGION_REGEX
             .captures(s)
-            .ok_or(FtraceError::InvalidRegionTable)?;
+            .ok_or(SymbolError::InvalidRegionTable)?;
 
         let va_hex = caps
             .name("va")
             .and_then(|s| s.as_str().strip_prefix("0x"))
-            .ok_or(FtraceError::InvalidRegionTable)?;
+            .ok_or(SymbolError::InvalidRegionTable)?;
         let pa_hex = caps
             .name("pa")
             .and_then(|s| s.as_str().strip_prefix("0x"))
-            .ok_or(FtraceError::InvalidRegionTable)?;
+            .ok_or(SymbolError::InvalidRegionTable)?;
         let size_hex = caps
             .name("size")
             .and_then(|s| s.as_str().strip_prefix("0x"))
-            .ok_or(FtraceError::InvalidRegionTable)?;
+            .ok_or(SymbolError::InvalidRegionTable)?;
         let flags_str = caps
             .name("flags")
-            .ok_or(FtraceError::InvalidRegionTable)?
+            .ok_or(SymbolError::InvalidRegionTable)?
             .as_str();
 
-        let va = u64::from_str_radix(va_hex, 16).map_err(|_| FtraceError::InvalidRegionTable)?;
-        let pa = u64::from_str_radix(pa_hex, 16).map_err(|_| FtraceError::InvalidRegionTable)?;
+        let va = u64::from_str_radix(va_hex, 16).map_err(|_| SymbolError::InvalidRegionTable)?;
+        let pa = u64::from_str_radix(pa_hex, 16).map_err(|_| SymbolError::InvalidRegionTable)?;
         let size =
-            usize::from_str_radix(size_hex, 16).map_err(|_| FtraceError::InvalidRegionTable)?;
+            usize::from_str_radix(size_hex, 16).map_err(|_| SymbolError::InvalidRegionTable)?;
         let flags = RegionFlags::from_str(flags_str)?;
         let elf_idx = if let Some(elf_idx_str) = caps.name("elf_idx") {
             Some(
                 elf_idx_str
                     .as_str()
                     .parse()
-                    .map_err(|_| FtraceError::InvalidRegionTable)?,
+                    .map_err(|_| SymbolError::InvalidRegionTable)?,
             )
         } else {
             None
@@ -206,7 +206,7 @@ bitflags! {
 }
 
 impl FromStr for RegionFlags {
-    type Err = FtraceError;
+    type Err = SymbolError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut flags = RegionFlags::empty();
@@ -217,7 +217,7 @@ impl FromStr for RegionFlags {
                 'x' => flags |= RegionFlags::EXEC,
                 's' => flags |= RegionFlags::SECURE,
                 '-' => (),
-                _ => return Err(FtraceError::InvalidRegionFlags),
+                _ => return Err(SymbolError::InvalidRegionFlags),
             }
         }
         Ok(flags)

@@ -1,6 +1,6 @@
 use crate::{
     cli::Cli,
-    ftrace::SymbolInfo,
+    symbol::info::SymbolInfo,
     reader::build_ftrace_tree_from_file,
     ui::{
         components::{Component as _, TraceTreeComponent},
