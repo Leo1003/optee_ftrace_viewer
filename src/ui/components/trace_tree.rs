@@ -129,7 +129,7 @@ fn build_ftrace_ui_tree(
     let mut children_duration = Duration::ZERO;
     let time = node.time().unwrap_or_default();
     for (child_id, children) in node.children().enumerate() {
-        children_tree_items.push(build_ftrace_ui_tree(child_id as u64, children, upper_time));
+        children_tree_items.push(build_ftrace_ui_tree(child_id as u64, children, time));
         children_duration += children.time().unwrap_or_default();
     }
     let self_time = time.saturating_sub(children_duration);
