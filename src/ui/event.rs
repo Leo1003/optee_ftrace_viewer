@@ -6,6 +6,7 @@ use tokio::{
     time::{Interval, MissedTickBehavior},
 };
 
+#[allow(unused)]
 #[derive(Clone, Debug)]
 pub enum Event<Msg = ()> {
     Key(KeyEvent),

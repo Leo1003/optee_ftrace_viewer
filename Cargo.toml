@@ -15,10 +15,10 @@ memchr = "2.7.5"
 thiserror = "2.0.16"
 tokio = { version = "1.47.1", features = ["macros", "fs", "rt-multi-thread", "process", "io-util", "time", "sync"] }
 futures = "0.3.31"
-elf = "0.8.0"
 regex = "1.11.2"
 bitflags = "2.9.3"
 uuid = "1.18.0"
+addr2line = "0.25.0"
 
 # Ratatui related dependencies
 crossterm = { version = "0.28.1", features = ["event-stream"] }

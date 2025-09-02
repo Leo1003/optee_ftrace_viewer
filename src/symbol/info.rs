@@ -1,5 +1,5 @@
-use super::error::SymbolError;
-use bitflags::bitflags;
+use super::{error::SymbolError, region::RegionFlags};
+use crate::symbol::region::{LoadInfo, TeeInfo};
 use regex::Regex;
 use std::{collections::HashMap, str::FromStr, sync::LazyLock};
 use uuid::Uuid;
@@ -23,6 +23,7 @@ static ELF_LIST_REGEX: LazyLock<Regex> =
 static FUNC_GRAPH_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(FUNC_GRAPH_RS).expect("Failed to compile function graph regex"));
 
+#[allow(unused)]
 #[derive(Clone, Debug)]
 pub struct SymbolInfo {
     pub tee_load_addr: u64,
@@ -31,6 +32,31 @@ pub struct SymbolInfo {
     pub title: String,
     pub ta_uuid: Uuid,
     pub ta_load_addr: u64,
+}
+
+impl SymbolInfo {
+    pub fn find_by_addr(&self, addr: u64) -> Option<LoadInfo> {
+        for region in &self.regions {
+            if addr >= region.va && addr < region.va + region.size as u64 {
+                let Some(elf_idx) = region.elf_idx else {
+                    continue;
+                };
+                let Some(elf_info) = self.elf_list.get(&elf_idx) else {
+                    continue;
+                };
+                return Some(LoadInfo::TrustedApp(
+                    (region.clone(), elf_info.clone()).into(),
+                ));
+            }
+        }
+        if addr >= self.tee_load_addr {
+            Some(LoadInfo::Tee(TeeInfo {
+                load_addr: self.tee_load_addr,
+            }))
+        } else {
+            None
+        }
+    }
 }
 
 impl FromStr for SymbolInfo {
@@ -191,35 +217,5 @@ impl FromStr for RegionData {
             flags,
             elf_idx,
         })
-    }
-}
-
-bitflags! {
-    #[repr(transparent)]
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-    pub struct RegionFlags: u32 {
-        const READ = 0b0001;
-        const WRITE = 0b0010;
-        const EXEC = 0b0100;
-        const SECURE = 0b1000;
-    }
-}
-
-impl FromStr for RegionFlags {
-    type Err = SymbolError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut flags = RegionFlags::empty();
-        for c in s.chars() {
-            match c {
-                'r' => flags |= RegionFlags::READ,
-                'w' => flags |= RegionFlags::WRITE,
-                'x' => flags |= RegionFlags::EXEC,
-                's' => flags |= RegionFlags::SECURE,
-                '-' => (),
-                _ => return Err(SymbolError::InvalidRegionFlags),
-            }
-        }
-        Ok(flags)
     }
 }

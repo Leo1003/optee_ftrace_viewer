@@ -7,6 +7,7 @@ pub struct FtraceTree {
     children: Vec<FtraceNode>,
 }
 
+#[allow(dead_code)]
 impl FtraceTree {
     pub fn new(trace_info: String, children: Vec<FtraceNode>) -> Self {
         Self {
@@ -30,6 +31,10 @@ impl FtraceTree {
         self.children.iter()
     }
 
+    pub fn children_mut(&mut self) -> impl Iterator<Item = &mut FtraceNode> {
+        self.children.iter_mut()
+    }
+
     pub fn dfs_iter(&self) -> FtraceDfsIter<'_> {
         FtraceDfsIter {
             stack: vec![self.children.iter()],
@@ -42,6 +47,7 @@ pub struct FtraceNode {
     children: Vec<FtraceNode>,
     depth: u8,
     func: u64,
+    symbol: Option<String>,
     time: Option<Duration>,
 }
 
@@ -51,6 +57,7 @@ impl FtraceNode {
             children: Vec::new(),
             depth,
             func,
+            symbol: None,
             time,
         }
     }
@@ -82,6 +89,14 @@ impl FtraceNode {
 
     pub fn func(&self) -> u64 {
         self.func
+    }
+
+    pub fn symbol(&self) -> Option<&str> {
+        self.symbol.as_deref()
+    }
+
+    pub fn set_symbol(&mut self, symbol: String) {
+        self.symbol = Some(symbol);
     }
 
     pub fn time(&self) -> Option<Duration> {

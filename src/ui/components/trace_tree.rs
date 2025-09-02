@@ -6,7 +6,11 @@ use crate::{
 };
 use crossterm::event::{KeyCode, MouseButton, MouseEventKind};
 use ratatui::{
-    layout::{Alignment, Position, Rect}, style::{Color, Modifier, Style}, text::{Line, Span, Text}, widgets::{Block, BorderType, Borders}, Frame
+    Frame,
+    layout::{Alignment, Position, Rect},
+    style::{Color, Modifier, Style},
+    text::{Line, Span, Text},
+    widgets::{Block, BorderType},
 };
 use std::time::Duration;
 use tui_tree_widget::{Tree, TreeItem, TreeState};
@@ -27,6 +31,7 @@ impl TraceTreeComponent {
         }
     }
 
+    #[allow(unused)]
     pub fn with_ftrace_tree(tree: &FtraceTree) -> Self {
         TraceTreeComponent {
             data: Self::build_tree_data(tree),
@@ -136,7 +141,7 @@ fn build_ftrace_ui_tree(
 
     let text = TraceLine {
         addr: node.func(),
-        symbol: None,
+        symbol: node.symbol().map(|s| s.to_owned()),
         time,
         self_time,
         upper_time,

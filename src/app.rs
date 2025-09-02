@@ -1,7 +1,8 @@
 use crate::{
     cli::Cli,
-    symbol::info::SymbolInfo,
+    ftrace::FtraceNode,
     reader::build_ftrace_tree_from_file,
+    symbol::{info::SymbolInfo, resolver::SymbolResolver},
     ui::{
         components::{Component as _, TraceTreeComponent},
         event::{Event, EventGenerator},
@@ -10,7 +11,10 @@ use crate::{
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{DefaultTerminal, crossterm};
-use std::{path::Path, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 use tokio::sync::mpsc::UnboundedSender;
 use tui_tree_widget::TreeItem;
 
@@ -32,8 +36,9 @@ impl App {
 
     pub async fn run(&mut self, mut terminal: DefaultTerminal) -> Result<()> {
         let ftrace_file = self.args.ftrace_path.clone();
+        let sources = self.args.elf.clone();
         let event_sender = self.event_generator.get_app_event_sender();
-        tokio::spawn(async move { initialize_ftrace(&ftrace_file, event_sender).await });
+        tokio::spawn(async move { initialize_ftrace(&ftrace_file, sources, event_sender).await });
         let mut tree_component = TraceTreeComponent::new();
 
         while !self.stopping {
@@ -70,12 +75,41 @@ pub enum AppMsg {
 
 async fn initialize_ftrace(
     ftrace_file: &Path,
+    sources: Vec<PathBuf>,
     event_sender: UnboundedSender<AppMsg>,
 ) -> Result<()> {
-    let tree = build_ftrace_tree_from_file(ftrace_file).await?;
-    let tree_data = TraceTreeComponent::build_tree_data(&tree);
+    let mut tree = build_ftrace_tree_from_file(ftrace_file).await?;
     let symbol_info: SymbolInfo = tree.trace_info().parse()?;
+    let mut resolver = SymbolResolver::new(sources);
+    for node in tree.children_mut() {
+        recursive_resolve_symbol(&mut resolver, &symbol_info, node);
+    }
+    let tree_data = TraceTreeComponent::build_tree_data(&tree);
     event_sender.send(AppMsg::SetFtraceTitle(symbol_info.title.clone()))?;
     event_sender.send(AppMsg::UpdateTree(tree_data))?;
     Ok(())
+}
+
+fn recursive_resolve_symbol(
+    resolver: &mut SymbolResolver,
+    symbol_info: &SymbolInfo,
+    node: &mut FtraceNode,
+) {
+    if let Some(symbol) = resolve_symbol(resolver, symbol_info, node.func()) {
+        node.set_symbol(symbol);
+    }
+
+    for child in node.children_mut() {
+        recursive_resolve_symbol(resolver, symbol_info, child);
+    }
+}
+
+fn resolve_symbol(
+    resolver: &mut SymbolResolver,
+    symbol_info: &SymbolInfo,
+    addr: u64,
+) -> Option<String> {
+    let load_info = symbol_info.find_by_addr(addr)?;
+    let reladdr = load_info.calculate_reladdr(addr)?;
+    resolver.resolve_symbol(&load_info, reladdr)
 }
