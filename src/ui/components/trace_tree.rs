@@ -192,11 +192,13 @@ impl From<TraceLine> for Text<'static> {
 }
 
 fn format_duration(duration: Duration) -> String {
-    if duration.as_secs() > 0 {
+    if duration.as_secs() >= 1000 {
+        format!("{:7} s ", duration.as_secs_f64())
+    } else if duration.as_secs() > 0 {
         format!(
-            "{:3}.{:03} s",
+            "{:3}.{:03} s ",
             duration.as_secs(),
-            duration.subsec_millis() / 1000
+            duration.subsec_millis()
         )
     } else if duration.as_millis() > 0 {
         format!(
@@ -211,6 +213,27 @@ fn format_duration(duration: Duration) -> String {
             duration.subsec_nanos() % 1000
         )
     } else {
-        format!("{} ns", duration.as_nanos())
+        format!("{:7} ns", duration.as_nanos())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn test_format_duration() {
+        assert_eq!(format_duration(Duration::from_nanos(123)), "    123 ns");
+        assert_eq!(format_duration(Duration::from_nanos(241_452)), "241.452 µs");
+        assert_eq!(
+            format_duration(Duration::from_nanos(343_234_431)),
+            "343.234 ms"
+        );
+        assert_eq!(
+            format_duration(Duration::from_millis(1_140_840)),
+            "1140.84 s "
+        );
+        assert_eq!(format_duration(Duration::from_secs(123_456)), " 123456 s ");
     }
 }
