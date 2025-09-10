@@ -9,6 +9,7 @@ mod ftrace;
 mod reader;
 mod symbol;
 mod ui;
+mod utils;
 
 #[tokio::main]
 async fn main() -> Result<()> {

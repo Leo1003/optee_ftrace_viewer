@@ -2,7 +2,10 @@ use crate::{
     cli::Cli,
     ftrace::FtraceNode,
     reader::build_ftrace_tree_from_file,
-    symbol::{info::SymbolInfo, resolver::SymbolResolver},
+    symbol::{
+        info::SymbolInfo,
+        resolver::{CachedSymbolResolver, SymbolResolver},
+    },
     ui::{
         components::{Component as _, TraceTreeComponent},
         event::{Event, EventGenerator},
@@ -13,6 +16,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{DefaultTerminal, crossterm};
 use std::{
     path::{Path, PathBuf},
+    sync::Arc,
     time::Duration,
 };
 use tokio::sync::mpsc::UnboundedSender;
@@ -80,9 +84,10 @@ async fn initialize_ftrace(
 ) -> Result<()> {
     let mut tree = build_ftrace_tree_from_file(ftrace_file).await?;
     let symbol_info: SymbolInfo = tree.trace_info().parse()?;
-    let mut resolver = SymbolResolver::new(sources);
+    let resolver = SymbolResolver::new(sources);
+    let mut resolver = CachedSymbolResolver::new(resolver);
     for node in tree.children_mut() {
-        recursive_resolve_symbol(&mut resolver, &symbol_info, node);
+        recursive_resolve_symbol(&mut resolver, &symbol_info, node).await;
     }
     let tree_data = TraceTreeComponent::build_tree_data(&tree);
     event_sender.send(AppMsg::SetFtraceTitle(symbol_info.title.clone()))?;
@@ -90,26 +95,26 @@ async fn initialize_ftrace(
     Ok(())
 }
 
-fn recursive_resolve_symbol(
-    resolver: &mut SymbolResolver,
+async fn recursive_resolve_symbol(
+    resolver: &mut CachedSymbolResolver,
     symbol_info: &SymbolInfo,
     node: &mut FtraceNode,
 ) {
-    if let Some(symbol) = resolve_symbol(resolver, symbol_info, node.func()) {
+    if let Some(symbol) = resolve_symbol(resolver, symbol_info, node.func()).await {
         node.set_symbol(symbol);
     }
 
     for child in node.children_mut() {
-        recursive_resolve_symbol(resolver, symbol_info, child);
+        Box::pin(recursive_resolve_symbol(resolver, symbol_info, child)).await;
     }
 }
 
-fn resolve_symbol(
-    resolver: &mut SymbolResolver,
+async fn resolve_symbol(
+    resolver: &mut CachedSymbolResolver,
     symbol_info: &SymbolInfo,
     addr: u64,
-) -> Option<String> {
+) -> Option<Arc<String>> {
     let load_info = symbol_info.find_by_addr(addr)?;
     let reladdr = load_info.calculate_reladdr(addr)?;
-    resolver.resolve_symbol(&load_info, reladdr)
+    resolver.resolve_symbol(&load_info, reladdr).await
 }

@@ -1,5 +1,5 @@
 use crate::ftrace::{FtraceError, RawFtrace};
-use std::{iter::FusedIterator, time::Duration};
+use std::{iter::FusedIterator, sync::Arc, time::Duration};
 
 #[derive(Clone, Debug)]
 pub struct FtraceTree {
@@ -47,7 +47,7 @@ pub struct FtraceNode {
     children: Vec<FtraceNode>,
     depth: u8,
     func: u64,
-    symbol: Option<String>,
+    symbol: Option<Arc<String>>,
     time: Option<Duration>,
 }
 
@@ -92,10 +92,10 @@ impl FtraceNode {
     }
 
     pub fn symbol(&self) -> Option<&str> {
-        self.symbol.as_deref()
+        self.symbol.as_deref().map(|s| s.as_str())
     }
 
-    pub fn set_symbol(&mut self, symbol: String) {
+    pub fn set_symbol(&mut self, symbol: Arc<String>) {
         self.symbol = Some(symbol);
     }
 

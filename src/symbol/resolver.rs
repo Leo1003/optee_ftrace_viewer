@@ -1,12 +1,52 @@
-use crate::symbol::region::LoadInfo;
+use crate::{
+    symbol::{region::LoadInfo, resolver},
+    utils::FormatFn,
+};
 use addr2line::Loader;
 use color_eyre::eyre::{Result, eyre};
+use moka::{future::Cache, ops::compute::Op};
 use std::{
     collections::HashMap,
     ffi::OsStr,
+    fmt::{Debug, Formatter},
+    future::ready,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 use uuid::Uuid;
+
+#[derive(Debug)]
+pub struct CachedSymbolResolver {
+    resolver: SymbolResolver,
+    cache: Cache<u64, Arc<String>>,
+}
+
+impl CachedSymbolResolver {
+    pub fn new(resolver: SymbolResolver) -> Self {
+        Self::with_capacity(resolver, 8192)
+    }
+
+    pub fn with_capacity(resolver: SymbolResolver, capacity: u64) -> Self {
+        Self {
+            resolver,
+            cache: Cache::builder().max_capacity(capacity).build(),
+        }
+    }
+
+    pub async fn resolve_symbol(&mut self, load_info: &LoadInfo, addr: u64) -> Option<Arc<String>> {
+        self.cache
+            .entry(addr)
+            .and_compute_with(
+                |_entry| match self.resolver.resolve_symbol(load_info, addr) {
+                    Some(symbol) => ready(Op::Put(Arc::new(symbol))),
+                    None => ready(Op::Nop),
+                },
+            )
+            .await
+            .into_entry()
+            .map(|entry| Arc::clone(entry.value()))
+    }
+}
 
 pub struct SymbolResolver {
     elf: HashMap<Option<Uuid>, Loader>,
@@ -66,5 +106,23 @@ impl SymbolResolver {
             }
         }
         None
+    }
+}
+
+impl Debug for SymbolResolver {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SymbolResolver")
+            .field(
+                "elf",
+                &FormatFn::new(|f| {
+                    // Loader does not implement Debug, so we just print the keys
+                    // and a placeholder for the values.
+                    f.debug_map()
+                        .entries(self.elf.keys().map(|k| (k, "Loader { ... }")))
+                        .finish()
+                }),
+            )
+            .field("sources", &self.sources)
+            .finish()
     }
 }
