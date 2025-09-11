@@ -1,7 +1,4 @@
-use crate::{
-    symbol::{region::LoadInfo, resolver},
-    utils::FormatFn,
-};
+use crate::{symbol::region::LoadInfo, utils::FormatFn};
 use addr2line::Loader;
 use color_eyre::eyre::{Result, eyre};
 use moka::{future::Cache, ops::compute::Op};
