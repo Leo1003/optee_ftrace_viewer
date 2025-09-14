@@ -49,6 +49,7 @@ pub struct FtraceNode {
     func: u64,
     symbol: Option<Arc<String>>,
     time: Option<Duration>,
+    children_time: Duration,
 }
 
 impl FtraceNode {
@@ -59,6 +60,7 @@ impl FtraceNode {
             func,
             symbol: None,
             time,
+            children_time: Duration::ZERO,
         }
     }
 
@@ -80,6 +82,9 @@ impl FtraceNode {
     }
 
     pub fn add_child(&mut self, child: FtraceNode) {
+        if let Some(time) = child.time() {
+            self.children_time += time;
+        }
         self.children.push(child);
     }
 
@@ -101,6 +106,14 @@ impl FtraceNode {
 
     pub fn time(&self) -> Option<Duration> {
         self.time
+    }
+
+    pub fn self_time(&self) -> Option<Duration> {
+        self.time.map(|t| t.saturating_sub(self.children_time()))
+    }
+
+    pub fn children_time(&self) -> Duration {
+        self.children_time
     }
 
     pub fn children(&self) -> impl Iterator<Item = &FtraceNode> {
