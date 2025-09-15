@@ -38,7 +38,7 @@ impl App {
         }
     }
 
-    pub async fn run(&mut self, mut terminal: DefaultTerminal) -> Result<()> {
+    pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         let ftrace_file = self.args.ftrace_path.clone();
         let sources = self.args.elf.clone();
         let event_sender = self.event_generator.get_app_event_sender();
