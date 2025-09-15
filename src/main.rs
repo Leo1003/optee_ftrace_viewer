@@ -11,11 +11,15 @@ mod symbol;
 mod ui;
 mod utils;
 
-#[allow(clippy::await_holding_lock)]
 #[tokio::main]
 async fn main() -> Result<()> {
     color_eyre::install()?;
     let args = Cli::parse();
+    tui_main(args).await
+}
+
+#[allow(clippy::await_holding_lock)]
+async fn tui_main(args: Cli) -> Result<()> {
     let terminal_ctx = TerminalContext::get()?;
     let mut terminal_lock = terminal_ctx.terminal().lock().unwrap();
 

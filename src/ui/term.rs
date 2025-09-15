@@ -4,8 +4,11 @@ use crossterm::{
 };
 use ratatui::{Terminal, prelude::CrosstermBackend};
 use std::{
+    fmt::{Debug, Formatter},
     io::{Stdout, stdout},
+    panic::PanicHookInfo,
     sync::{Arc, Mutex, Weak},
+    thread,
 };
 
 static GLOBAL_TERMINAL_CONTEXT: Mutex<Weak<TerminalContext>> = Mutex::new(Weak::new());
@@ -31,6 +34,11 @@ impl TerminalContext {
         enable_raw_mode()?;
         let mut stdout = stdout();
         crossterm::execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+        let orig_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            panic_restore_terminal();
+            orig_hook(info);
+        }));
         Ok(Self {
             terminal: Mutex::new(Terminal::new(CrosstermBackend::new(stdout))?),
         })
@@ -43,7 +51,10 @@ impl TerminalContext {
 
 impl Drop for TerminalContext {
     fn drop(&mut self) {
-        let terminal = self.terminal.get_mut().unwrap();
+        let terminal = match self.terminal.get_mut() {
+            Ok(terminal) => terminal,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         disable_raw_mode().unwrap();
         crossterm::execute!(
             terminal.backend_mut(),
@@ -52,5 +63,13 @@ impl Drop for TerminalContext {
         )
         .unwrap();
         terminal.show_cursor().unwrap();
+        if !thread::panicking() {
+            let _ = std::panic::take_hook();
+        }
     }
+}
+
+fn panic_restore_terminal() {
+    disable_raw_mode().ok();
+    crossterm::execute!(stdout(), LeaveAlternateScreen).ok();
 }
